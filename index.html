@@ -1,0 +1,35 @@
+const TURN_SERVER_USERNAME = 'your_turn_username';
+const TURN_SERVER_PASSWORD = 'your_turn_password';
+const TURN_SERVER_URI = 'your_turn_server_uri';
+
+// Use a WebRTC library like Simple Peer
+const peerA = new SimplePeer({ initiator: true, trickle: false, stunServer: [{ url: 'stun:stun.l.google.com:19302' }] });
+const peerB = new SimplePeer({ trickle: false, stunServer: [{ url: 'stun:stun.l.google.com:19302' }] });
+
+peerA.on('signal', data => {
+  peerB.signal(data);
+});
+
+peerB.on('signal', data => {
+  peerA.signal(data);
+});
+
+peerA.on('connect', () => {
+  // Connection established between peers
+  console.log('Peer A connected');
+  // Send/receive data on peerA.channel
+});
+
+peerB.on('connect', () => {
+  // Connection established between peers
+  console.log('Peer B connected');
+  // Send/receive data on peerB.channel
+});
+
+// Use ICE Servers from your TURN server provider (if needed)
+peerA.addIceCandidate(yourIceCandidateObject);
+peerB.addIceCandidate(yourIceCandidateObject);
+
+// Connect using TURN server credentials (if needed)
+peerA.addTURNServer(TURN_SERVER_URI, { username: TURN_SERVER_USERNAME, credential: TURN_SERVER_PASSWORD });
+peerB.addTURNServer(TURN_SERVER_URI, { username: TURN_SERVER_USERNAME, credential: TURN_SERVER_PASSWORD });
