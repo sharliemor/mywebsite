@@ -16,18 +16,42 @@
   <video id="localVideo" autoplay playsinline></video>
   <video id="remoteVideo" autoplay playsinline></video>
 
+  <script src="https://cdn.webrtc-experiment.com/RTCPeerConnection-v1.5.js"></script>
+  <script src="https://cdn.webrtc-experiment.com/getScreenId.js"></script>
+  <script src="https://cdn.webrtc-experiment.com/websocket.js"></script>
+
   <script>
-    // Function to fetch credentials from backend
-    async function fetchCredentials() {
+    // Function to generate credentials
+    async function generateCredentials() {
       try {
-        const response = await fetch('YOUR_BACKEND_ENDPOINT');
+        // Replace with your actual TURN Token ID and API Token
+        const TURN_TOKEN_ID = 'your_turn_token_id';
+        const API_TOKEN = 'your_api_token';
+
+        // Step 1: Generate timestamp in Unix epoch format (seconds)
+        const timestamp = Math.floor(Date.now() / 1000);
+
+        // Step 2: Create HMAC-SHA1 signature of the timestamp using API token
+        const hmac = CryptoJS.HmacSHA1(timestamp.toString(), API_TOKEN);
+        const signature = hmac.toString(CryptoJS.enc.Base64);
+
+        // Step 3: Make API call to Cloudflare's TURN API to generate credentials
+        const url = `https://api.cloudflare.com/client/v4/accounts/self/turn/users/${TURN_TOKEN_ID}/credentials`;
+        const headers = {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+          'X-Timestamp': timestamp,
+          'X-Signature': signature
+        };
+
+        const response = await fetch(url, { method: 'POST', headers });
         if (!response.ok) {
-          throw new Error('Failed to fetch credentials');
+          throw new Error('Failed to generate credentials');
         }
-        const data = await response.json();
-        return data;
+        const credentials = await response.json();
+        return credentials;
       } catch (error) {
-        console.error('Error fetching credentials:', error);
+        console.error('Error generating credentials:', error);
         throw error;
       }
     }
@@ -35,19 +59,10 @@
     // Function to start the WebRTC connection
     async function startWebRTC() {
       try {
-        const { username, credential } = await fetchCredentials();
+        const { iceServers } = await generateCredentials();
 
         const configuration = {
-          iceServers: [{
-            urls: [
-              'stun:stun.cloudflare.com:3478',
-              'turn:turn.cloudflare.com:3478?transport=udp',
-              'turn:turn.cloudflare.com:3478?transport=tcp',
-              'turns:turn.cloudflare.com:5349?transport=tcp'
-            ],
-            username: username,
-            credential: credential
-          }]
+          iceServers: iceServers
         };
 
         const localVideo = document.getElementById('localVideo');
