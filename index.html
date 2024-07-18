@@ -1,39 +1,100 @@
-<html>
-<script>
-const TURN_SERVER_USERNAME = 'your_turn_username';
-const TURN_SERVER_PASSWORD = 'your_turn_password';
-const TURN_SERVER_URI = 'your_turn_server_uri';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WebRTC Client</title>
+  <style>
+    #localVideo, #remoteVideo {
+      width: 320px;
+      height: 240px;
+      border: 1px solid black;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebRTC Client Example</h1>
+  <video id="localVideo" autoplay playsinline></video>
+  <video id="remoteVideo" autoplay playsinline></video>
 
-// Use a WebRTC library like Simple Peer
-const peerA = new SimplePeer({ initiator: true, trickle: false, stunServer: [{ url: 'stun:stun.l.google.com:19302' }] });
-const peerB = new SimplePeer({ trickle: false, stunServer: [{ url: 'stun:stun.l.google.com:19302' }] });
+  <script>
+    // Function to fetch credentials from backend
+    async function fetchCredentials() {
+      try {
+        const response = await fetch('YOUR_BACKEND_ENDPOINT');
+        if (!response.ok) {
+          throw new Error('Failed to fetch credentials');
+        }
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('Error fetching credentials:', error);
+        throw error;
+      }
+    }
 
-peerA.on('signal', data => {
-  peerB.signal(data);
-});
+    // Function to start the WebRTC connection
+    async function startWebRTC() {
+      try {
+        const { username, credential } = await fetchCredentials();
 
-peerB.on('signal', data => {
-  peerA.signal(data);
-});
+        const configuration = {
+          iceServers: [{
+            urls: [
+              'stun:stun.cloudflare.com:3478',
+              'turn:turn.cloudflare.com:3478?transport=udp',
+              'turn:turn.cloudflare.com:3478?transport=tcp',
+              'turns:turn.cloudflare.com:5349?transport=tcp'
+            ],
+            username: username,
+            credential: credential
+          }]
+        };
 
-peerA.on('connect', () => {
-  // Connection established between peers
-  console.log('Peer A connected');
-  // Send/receive data on peerA.channel
-});
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
 
-peerB.on('connect', () => {
-  // Connection established between peers
-  console.log('Peer B connected');
-  // Send/receive data on peerB.channel
-});
+        // Create RTCPeerConnection
+        const peerConnection = new RTCPeerConnection(configuration);
 
-// Use ICE Servers from your TURN server provider (if needed)
-peerA.addIceCandidate(yourIceCandidateObject);
-peerB.addIceCandidate(yourIceCandidateObject);
+        // Add local stream to peer connection
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+          .then(stream => {
+            localVideo.srcObject = stream;
+            stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+          })
+          .catch(error => console.error('Error accessing media devices:', error));
 
-// Connect using TURN server credentials (if needed)
-peerA.addTURNServer(TURN_SERVER_URI, { username: TURN_SERVER_USERNAME, credential: TURN_SERVER_PASSWORD });
-peerB.addTURNServer(TURN_SERVER_URI, { username: TURN_SERVER_USERNAME, credential: TURN_SERVER_PASSWORD });
-</script>
+        // Handle incoming streams
+        peerConnection.ontrack = function(event) {
+          if (event.streams && event.streams[0]) {
+            remoteVideo.srcObject = event.streams[0];
+          } else {
+            if (!remoteVideo.srcObject) {
+              remoteVideo.srcObject = new MediaStream();
+            }
+            remoteVideo.srcObject.addTrack(event.track);
+          }
+        };
+
+        // Handle ICE candidates
+        peerConnection.onicecandidate = function(event) {
+          if (event.candidate) {
+            // Send the candidate to the remote peer (implement signaling here)
+          }
+        };
+
+        // Offer creation and exchange
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        // Send offer to the remote peer (implement signaling here)
+
+      } catch (error) {
+        console.error('Error starting WebRTC:', error);
+      }
+    }
+
+    // Start the WebRTC connection when the page is loaded
+    document.addEventListener('DOMContentLoaded', startWebRTC);
+  </script>
+</body>
 </html>
